@@ -1,0 +1,48 @@
+{
+  "name": "gumbees-mem0-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for mem0 with user authentication support",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "web-only": "WEB_ENABLED=true MCP_ENABLED=false node src/web-server.js",
+    "mcp-only": "WEB_ENABLED=false node src/index.js",
+    "build": "echo 'No build step required'",
+    "test": "echo 'Tests not implemented yet'"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.4.0",
+    "axios": "^1.6.0",
+    "bcrypt": "^5.1.1",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "passport": "^0.7.0",
+    "passport-openidconnect": "^0.1.1",
+    "passport-local": "^1.0.0",
+    "connect-redis": "^7.1.0",
+    "redis": "^4.6.0",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "morgan": "^1.10.0",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^9.0.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "mem0",
+    "memory",
+    "ai",
+    "authentication"
+  ],
+  "author": "Gumbees",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
