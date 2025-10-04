@@ -2,7 +2,8 @@ version: '3.8'
 
 services:
   faster-whisper:
-    image: fedirz/faster-whisper-server:latest-rocm
+    image: beecave/insanely-fast-whisper-rocm:main
+    runtime: amd
     expose:
       - "8000"
     environment:
@@ -10,93 +11,131 @@ services:
     volumes:
       - whisper_models:/app/models
     restart: unless-stopped
-    command: ["--host", "0.0.0.0", "--port", "8000"]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: amd
-              capabilities: [gpu]
+    command: ["--host", "0.0.0.0", "--port", "8000", "--model", "base"]
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.whisper.rule=Host(`${WHISPER_PUBLIC_DOMAIN}`)"
-      - "traefik.http.routers.whisper.entrypoints=websecure"
-      - "traefik.http.routers.whisper.tls.certresolver=letsencrypt"
+      # Public Domain
+      - "traefik.http.routers.whisper-public.rule=Host(`${WHISPER_PUBLIC_DOMAIN}`)"
+      - "traefik.http.routers.whisper-public.entrypoints=websecure"
+      - "traefik.http.routers.whisper-public.tls.certresolver=letsencrypt"
+      # Private Domain
+      - "traefik.http.routers.whisper-private.rule=Host(`${WHISPER_PRIVATE_DOMAIN}`)"
+      - "traefik.http.routers.whisper-private.entrypoints=websecure"
+      - "traefik.http.routers.whisper-private.tls.certresolver=letsencrypt"
+      # Service configuration
       - "traefik.http.services.whisper.loadbalancer.server.port=8000"
       - "traefik.docker.network=traefik_public"
     networks:
       - ai-app
       - traefik_public
 
-  ollama:
+  ollama-1:
     image: ollama/ollama:rocm
+    runtime: amd
     expose:
       - "11434"
     environment:
       - OLLAMA_HOST=0.0.0.0
+      - AMD_VISIBLE_DEVICES=all
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
     deploy:
       resources:
-        reservations:
-          devices:
-            - driver: amd
-              capabilities: [gpu]
+        limits:
+          cpus: '8'
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.ollama.rule=Host(`${OLLAMA_PUBLIC_DOMAIN}`)"
-      - "traefik.http.routers.ollama.entrypoints=websecure"
-      - "traefik.http.routers.ollama.tls.certresolver=letsencrypt"
+      # Public Domain
+      - "traefik.http.routers.ollama-public.rule=Host(`${OLLAMA_PUBLIC_DOMAIN}`)"
+      - "traefik.http.routers.ollama-public.entrypoints=websecure"
+      - "traefik.http.routers.ollama-public.tls.certresolver=letsencrypt"
+      # Private Domain
+      - "traefik.http.routers.ollama-private.rule=Host(`${OLLAMA_PRIVATE_DOMAIN}`)"
+      - "traefik.http.routers.ollama-private.entrypoints=websecure"
+      - "traefik.http.routers.ollama-private.tls.certresolver=letsencrypt"
+      # Service discovery
       - "traefik.http.services.ollama.loadbalancer.server.port=11434"
       - "traefik.docker.network=traefik_public"
     networks:
       - ai-app
       - traefik_public
 
-  postgresql:
-    image: postgres:15-alpine
+  ollama-2:
+    image: ollama/ollama:rocm
+    runtime: amd
+    expose:
+      - "11434"
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-mem0}
-      - POSTGRES_USER=${POSTGRES_USER:-mem0}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mem0_password}
+      - OLLAMA_HOST=0.0.0.0
+      - AMD_VISIBLE_DEVICES=all
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    expose:
-      - "5432"
+      - ollama_data:/root/.ollama
     restart: unless-stopped
-    networks:
-      - ai-app
-
-  mem0:
-    image: mem0ai/mem0:latest
-    expose:
-      - "8080"
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-mem0}:${POSTGRES_PASSWORD:-mem0_password}@postgresql:5432/${POSTGRES_DB:-mem0}
-      - OPENAI_API_KEY=${OPENROUTER_API_KEY:-${OPENAI_API_KEY}}
-      - OPENAI_API_BASE=${OPENROUTER_API_BASE:-https://api.openai.com/v1}
-      - LLM_MODEL=${LLM_MODEL:-gpt-3.5-turbo}
-      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
-      # Mem0 Authentication
-      - MEM0_API_KEY=${MEM0_API_KEY:-gumbees-mem0-secret-key}
-      - MEM0_AUTH_ENABLED=${MEM0_AUTH_ENABLED:-true}
-      - MEM0_ADMIN_TOKEN=${MEM0_ADMIN_TOKEN:-gumbees-admin-token-change-in-production}
-    depends_on:
-      - postgresql
-    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.mem0.rule=Host(`${MEM0_PUBLIC_DOMAIN}`)"
-      - "traefik.http.routers.mem0.entrypoints=websecure"
-      - "traefik.http.routers.mem0.tls.certresolver=letsencrypt"
-      - "traefik.http.services.mem0.loadbalancer.server.port=8080"
+      # Public Domain
+      - "traefik.http.routers.ollama-public.rule=Host(`${OLLAMA_PUBLIC_DOMAIN}`)"
+      - "traefik.http.routers.ollama-public.entrypoints=websecure"
+      - "traefik.http.routers.ollama-public.tls.certresolver=letsencrypt"
+      # Private Domain
+      - "traefik.http.routers.ollama-private.rule=Host(`${OLLAMA_PRIVATE_DOMAIN}`)"
+      - "traefik.http.routers.ollama-private.entrypoints=websecure"
+      - "traefik.http.routers.ollama-private.tls.certresolver=letsencrypt"
+      # Service discovery
+      - "traefik.http.services.ollama.loadbalancer.server.port=11434"
       - "traefik.docker.network=traefik_public"
-      # Security: Remove external access if not needed
-      - "traefik.http.routers.mem0.middlewares=mem0-auth"
     networks:
       - ai-app
       - traefik_public
+
+  # postgresql:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     - POSTGRES_DB=${POSTGRES_DB:-mem0}
+  #     - POSTGRES_USER=${POSTGRES_USER:-mem0}
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mem0_password}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   expose:
+  #     - "5432"
+  #   restart: unless-stopped
+  #   networks:
+  #     - ai-app
+
+  # mem0:
+  #   image: mem0ai/mem0:latest
+  #   expose:
+  #     - "8080"
+  #   environment:
+  #     - DATABASE_URL=postgresql://${POSTGRES_USER:-mem0}:${POSTGRES_PASSWORD:-mem0_password}@postgresql:5432/${POSTGRES_DB:-mem0}
+  #     - OPENAI_API_KEY=${OPENROUTER_API_KEY:-${OPENAI_API_KEY}}
+  #     - OPENAI_API_BASE=${OPENROUTER_API_BASE:-https://api.openai.com/v1}
+  #     - LLM_MODEL=${LLM_MODEL:-gpt-3.5-turbo}
+  #     - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+  #     # Mem0 Authentication
+  #     - MEM0_API_KEY=${MEM0_API_KEY:-gumbees-mem0-secret-key}
+  #     - MEM0_AUTH_ENABLED=${MEM0_AUTH_ENABLED:-true}
+  #     - MEM0_ADMIN_TOKEN=${MEM0_ADMIN_TOKEN:-gumbees-admin-token-change-in-production}
+  #   depends_on:
+  #     - postgresql
+  #   restart: unless-stopped
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.mem0.rule=Host(`${MEM0_PUBLIC_DOMAIN}`)"
+  #     - "traefik.http.routers.mem0.entrypoints=websecure"
+  #     - "traefik.http.routers.mem0.tls.certresolver=letsencrypt"
+  #     - "traefik.http.services.mem0.loadbalancer.server.port=8080"
+  #     - "traefik.docker.network=traefik_public"
+  #     # Security: Remove external access if not needed
+  #     - "traefik.http.routers.mem0.middlewares=mem0-auth"
+  #   networks:
+  #     - ai-app
+  #     - traefik_public
 
   # MCP Server - Commented out for initial setup
   # Uncomment when ready to enable MCP functionality
@@ -175,16 +214,16 @@ services:
   #     - ai-app
   #     - traefik_public
 
-  redis:
-    image: redis:7-alpine
-    expose:
-      - "6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-    networks:
-      - ai-app
-    command: redis-server --appendonly yes
+  # redis:
+  #   image: redis:7-alpine
+  #   expose:
+  #     - "6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   restart: unless-stopped
+  #   networks:
+  #     - ai-app
+  #   command: redis-server --appendonly yes
 
 networks:
   ai-app:
