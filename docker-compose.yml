@@ -1,33 +1,18 @@
-version: '3.8'
-
 services:
   faster-whisper:
-    image: beecave/insanely-fast-whisper-rocm:main
-    runtime: amd
+    image: onerahmet/openai-whisper-asr-webservice:latest
     expose:
-      - "8000"
+      - "9000"
     environment:
-      - MODEL_NAME=base
+      - ASR_MODEL=base
+      - PORT=9000
     volumes:
-      - whisper_models:/app/models
+      - whisper_models:/root/.cache/whisper
     restart: unless-stopped
-    command: ["--host", "0.0.0.0", "--port", "8000", "--model", "base"]
-    labels:
-      - "traefik.enable=true"
-      # Public Domain
-      - "traefik.http.routers.whisper-public.rule=Host(`${WHISPER_PUBLIC_DOMAIN}`)"
-      - "traefik.http.routers.whisper-public.entrypoints=websecure"
-      - "traefik.http.routers.whisper-public.tls.certresolver=letsencrypt"
-      # Private Domain
-      - "traefik.http.routers.whisper-private.rule=Host(`${WHISPER_PRIVATE_DOMAIN}`)"
-      - "traefik.http.routers.whisper-private.entrypoints=websecure"
-      - "traefik.http.routers.whisper-private.tls.certresolver=letsencrypt"
-      # Service configuration
-      - "traefik.http.services.whisper.loadbalancer.server.port=8000"
-      - "traefik.docker.network=traefik_public"
+    ports:
+      - "9000:9000"
     networks:
       - ai-app
-      - traefik_public
 
   ollama-1:
     image: ollama/ollama:rocm
@@ -44,22 +29,10 @@ services:
       resources:
         limits:
           cpus: '8'
-    labels:
-      - "traefik.enable=true"
-      # Public Domain
-      - "traefik.http.routers.ollama-public.rule=Host(`${OLLAMA_PUBLIC_DOMAIN}`)"
-      - "traefik.http.routers.ollama-public.entrypoints=websecure"
-      - "traefik.http.routers.ollama-public.tls.certresolver=letsencrypt"
-      # Private Domain
-      - "traefik.http.routers.ollama-private.rule=Host(`${OLLAMA_PRIVATE_DOMAIN}`)"
-      - "traefik.http.routers.ollama-private.entrypoints=websecure"
-      - "traefik.http.routers.ollama-private.tls.certresolver=letsencrypt"
-      # Service discovery
-      - "traefik.http.services.ollama.loadbalancer.server.port=11434"
-      - "traefik.docker.network=traefik_public"
+    ports:
+      - "11434:11434"
     networks:
       - ai-app
-      - traefik_public
 
   ollama-2:
     image: ollama/ollama:rocm
@@ -76,22 +49,10 @@ services:
       resources:
         limits:
           cpus: '8'
-    labels:
-      - "traefik.enable=true"
-      # Public Domain
-      - "traefik.http.routers.ollama-public.rule=Host(`${OLLAMA_PUBLIC_DOMAIN}`)"
-      - "traefik.http.routers.ollama-public.entrypoints=websecure"
-      - "traefik.http.routers.ollama-public.tls.certresolver=letsencrypt"
-      # Private Domain
-      - "traefik.http.routers.ollama-private.rule=Host(`${OLLAMA_PRIVATE_DOMAIN}`)"
-      - "traefik.http.routers.ollama-private.entrypoints=websecure"
-      - "traefik.http.routers.ollama-private.tls.certresolver=letsencrypt"
-      # Service discovery
-      - "traefik.http.services.ollama.loadbalancer.server.port=11434"
-      - "traefik.docker.network=traefik_public"
+    ports:
+      - "11435:11434"
     networks:
       - ai-app
-      - traefik_public
 
   # postgresql:
   #   image: postgres:15-alpine
@@ -228,8 +189,6 @@ services:
 networks:
   ai-app:
     driver: bridge
-  traefik_public:
-    external: true
 
 volumes:
   whisper_models:
