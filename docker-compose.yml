@@ -40,12 +40,12 @@ services:
       - faster-whisper
     labels:
       - "traefik.enable=true"
-      # Use a different subdomain for Bazarr compatibility
-      - "traefik.http.routers.whisper-bridge-public.rule=Host(`bazarr.${WHISPER_PUBLIC_DOMAIN}`)"
+      # Use bridge subdomain for clarity
+      - "traefik.http.routers.whisper-bridge-public.rule=Host(`bridge.${WHISPER_PUBLIC_DOMAIN}`)"
       - "traefik.http.routers.whisper-bridge-public.entrypoints=websecure"
       - "traefik.http.routers.whisper-bridge-public.tls.certresolver=letsencrypt"
       # Private Domain
-      - "traefik.http.routers.whisper-bridge-private.rule=Host(`bazarr.${WHISPER_PRIVATE_DOMAIN}`)"
+      - "traefik.http.routers.whisper-bridge-private.rule=Host(`bridge.${WHISPER_PRIVATE_DOMAIN}`)"
       - "traefik.http.routers.whisper-bridge-private.entrypoints=websecure"
       - "traefik.http.routers.whisper-bridge-private.tls.certresolver=letsencrypt"
       # Service configuration
