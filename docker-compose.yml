@@ -26,6 +26,35 @@ services:
       - ai-app
       - traefik_public
 
+  whisper-bridge:
+    image: mccloud/bazarr-openai-whisperbridge:latest
+    expose:
+      - "9000"
+    ports:
+      - "9001:9000"
+    environment:
+      - OPENAI_BASE_URL=http://faster-whisper:9000
+      - OPENAI_API_KEY=dummy-key-for-local-use
+    restart: unless-stopped
+    depends_on:
+      - faster-whisper
+    labels:
+      - "traefik.enable=true"
+      # Use a different subdomain for Bazarr compatibility
+      - "traefik.http.routers.whisper-bridge-public.rule=Host(`bazarr.${WHISPER_PUBLIC_DOMAIN}`)"
+      - "traefik.http.routers.whisper-bridge-public.entrypoints=websecure"
+      - "traefik.http.routers.whisper-bridge-public.tls.certresolver=letsencrypt"
+      # Private Domain
+      - "traefik.http.routers.whisper-bridge-private.rule=Host(`bazarr.${WHISPER_PRIVATE_DOMAIN}`)"
+      - "traefik.http.routers.whisper-bridge-private.entrypoints=websecure"
+      - "traefik.http.routers.whisper-bridge-private.tls.certresolver=letsencrypt"
+      # Service configuration
+      - "traefik.http.services.whisper-bridge.loadbalancer.server.port=9001"
+      - "traefik.docker.network=traefik_public"
+    networks:
+      - ai-app
+      - traefik_public
+
   ollama-1:
     image: ollama/ollama:rocm
     runtime: amd
