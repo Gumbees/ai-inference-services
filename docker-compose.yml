@@ -88,13 +88,15 @@ services:
     expose:
       - "8765"
     environment:
-      # Required to start (configure Ollama via UI/API after)
-      - OPENAI_API_KEY=${OPENMEMORY_OPENAI_KEY:-sk-dummy-configure-ollama-via-ui}
+      - OPENAI_API_KEY=sk-not-used-ollama-configured
       - USER=${OPENMEMORY_USER:-nate}
-      # Ollama connection (used after API configuration)
       - OLLAMA_HOST=http://ollama:11434
+      # Qdrant connection
+      - QDRANT_HOST=mem0_store
+      - QDRANT_PORT=6333
     volumes:
       - openmemory_data:/app/data
+      - ./openmemory-config.json:/usr/src/openmemory/api/config.json:ro
     restart: unless-stopped
     logging:
       driver: json-file
