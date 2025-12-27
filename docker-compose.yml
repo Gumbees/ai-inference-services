@@ -68,7 +68,7 @@ services:
   # Docs: https://docs.mem0.ai/openmemory/overview
   # Supports Ollama via API config after startup
 
-  openmemory-vectordb:
+  mem0_store:
     image: qdrant/qdrant:latest
     expose:
       - "6333"
@@ -102,7 +102,7 @@ services:
         max-size: "10m"
         max-file: "3"
     depends_on:
-      - openmemory-vectordb
+      - mem0_store
       - ollama
     labels:
       - "traefik.enable=true"
