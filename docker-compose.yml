@@ -88,6 +88,8 @@ services:
       - HINDSIGHT_API_LOG_LEVEL=${HINDSIGHT_LOG_LEVEL:-info}
       # Control Plane UI configuration
       - HINDSIGHT_CP_DATAPLANE_API_URL=http://localhost:8888
+      # Next.js must bind to all interfaces for Traefik
+      - HOSTNAME=0.0.0.0
     volumes:
       - hindsight_data:/home/hindsight/.pg0
     restart: unless-stopped
