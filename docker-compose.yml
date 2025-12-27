@@ -28,7 +28,6 @@ services:
       dmz:
         ipv4_address: 192.168.73.90
 
-
   ollama:
     image: ollama/ollama:rocm
     runtime: amd
@@ -62,58 +61,30 @@ services:
       - traefik_public
 
   # ============================================
-  # OpenMemory - AI Memory Layer with UI
+  # Hindsight - AI Memory Layer
   # ============================================
-  # Official mem0ai pre-built images with web dashboard
-  # Docs: https://docs.mem0.ai/openmemory/overview
-  # Supports Ollama via API config after startup
+  # Vectorize Hindsight with embedded PostgreSQL
+  # GitHub: https://github.com/vectorize-io/hindsight
+  # MCP endpoint: /mcp/{bank_id}/ (per-user memory banks)
 
-  openmemory-db:
-    image: postgres:15-alpine
+  hindsight:
+    image: ghcr.io/vectorize-io/hindsight:latest
     expose:
-      - "5432"
+      - "8888"
+      - "9999"
     environment:
-      - POSTGRES_USER=${OPENMEMORY_DB_USER:-openmemory}
-      - POSTGRES_PASSWORD=${OPENMEMORY_DB_PASSWORD:-openmemory}
-      - POSTGRES_DB=${OPENMEMORY_DB_NAME:-openmemory}
+      # LLM Configuration (Ollama)
+      - HINDSIGHT_API_LLM_PROVIDER=ollama
+      - HINDSIGHT_API_LLM_BASE_URL=http://ollama:11434/v1
+      - HINDSIGHT_API_LLM_MODEL=${HINDSIGHT_LLM_MODEL:-qwen2.5:7b}
+      # Embeddings use built-in local model (384-dim BAAI/bge-small-en-v1.5)
+      - HINDSIGHT_API_EMBEDDINGS_PROVIDER=local
+      # Server configuration
+      - HINDSIGHT_API_HOST=0.0.0.0
+      - HINDSIGHT_API_PORT=8888
+      - HINDSIGHT_API_LOG_LEVEL=${HINDSIGHT_LOG_LEVEL:-info}
     volumes:
-      - openmemory_db:/var/lib/postgresql/data
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - ai-app
-
-  mem0_store:
-    image: qdrant/qdrant:latest
-    expose:
-      - "6333"
-    volumes:
-      - openmemory_vectors:/qdrant/storage
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - ai-app
-
-  openmemory-mcp:
-    image: mem0/openmemory-mcp:latest
-    expose:
-      - "8765"
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - USER=${OPENMEMORY_USER:-nate}
-      # Qdrant connection
-      - QDRANT_HOST=mem0_store
-      - QDRANT_PORT=6333
-      # PostgreSQL connection (overrides default SQLite)
-      - DATABASE_URL=postgresql://${OPENMEMORY_DB_USER:-openmemory}:${OPENMEMORY_DB_PASSWORD:-openmemory}@openmemory-db:5432/${OPENMEMORY_DB_NAME:-openmemory}
+      - hindsight_data:/home/hindsight/.pg0
     restart: unless-stopped
     logging:
       driver: json-file
@@ -121,54 +92,33 @@ services:
         max-size: "10m"
         max-file: "3"
     depends_on:
-      - mem0_store
-      - openmemory-db
       - ollama
     labels:
       - "traefik.enable=true"
-      # Public Domain - API/MCP endpoint
-      - "traefik.http.routers.openmemory-api-public.rule=Host(`${OPENMEMORY_API_DOMAIN}`)"
-      - "traefik.http.routers.openmemory-api-public.entrypoints=websecure"
-      - "traefik.http.routers.openmemory-api-public.tls.certresolver=letsencrypt"
-      # Private Domain
-      - "traefik.http.routers.openmemory-api-private.rule=Host(`${OPENMEMORY_API_INTERNAL_DOMAIN}`)"
-      - "traefik.http.routers.openmemory-api-private.entrypoints=websecure"
-      - "traefik.http.routers.openmemory-api-private.tls.certresolver=letsencrypt"
-      # Service configuration
-      - "traefik.http.services.openmemory-api.loadbalancer.server.port=8765"
-      - "traefik.docker.network=traefik_public"
-    networks:
-      - ai-app
-      - traefik_public
-
-  openmemory-ui:
-    image: mem0/openmemory-ui:latest
-    expose:
-      - "3000"
-    environment:
-      # Must be external URL - browser can't reach internal Docker hostnames
-      - NEXT_PUBLIC_API_URL=https://${OPENMEMORY_API_INTERNAL_DOMAIN}
-      - NEXT_PUBLIC_USER_ID=${OPENMEMORY_USER:-nate}
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    depends_on:
-      - openmemory-mcp
-    labels:
-      - "traefik.enable=true"
-      # Public Domain - UI
-      - "traefik.http.routers.openmemory-ui-public.rule=Host(`${OPENMEMORY_UI_DOMAIN}`)"
-      - "traefik.http.routers.openmemory-ui-public.entrypoints=websecure"
-      - "traefik.http.routers.openmemory-ui-public.tls.certresolver=letsencrypt"
-      # Private Domain
-      - "traefik.http.routers.openmemory-ui-private.rule=Host(`${OPENMEMORY_UI_INTERNAL_DOMAIN}`)"
-      - "traefik.http.routers.openmemory-ui-private.entrypoints=websecure"
-      - "traefik.http.routers.openmemory-ui-private.tls.certresolver=letsencrypt"
-      # Service configuration
-      - "traefik.http.services.openmemory-ui.loadbalancer.server.port=3000"
+      # API - Public Domain (port 8888)
+      - "traefik.http.routers.hindsight-api-public.rule=Host(`${HINDSIGHT_API_DOMAIN}`)"
+      - "traefik.http.routers.hindsight-api-public.entrypoints=websecure"
+      - "traefik.http.routers.hindsight-api-public.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.hindsight-api-public.service=hindsight-api"
+      # API - Private Domain (port 8888)
+      - "traefik.http.routers.hindsight-api-private.rule=Host(`${HINDSIGHT_API_INTERNAL_DOMAIN}`)"
+      - "traefik.http.routers.hindsight-api-private.entrypoints=websecure"
+      - "traefik.http.routers.hindsight-api-private.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.hindsight-api-private.service=hindsight-api"
+      # API Service configuration
+      - "traefik.http.services.hindsight-api.loadbalancer.server.port=8888"
+      # UI - Public Domain (port 9999)
+      - "traefik.http.routers.hindsight-ui-public.rule=Host(`${HINDSIGHT_UI_DOMAIN}`)"
+      - "traefik.http.routers.hindsight-ui-public.entrypoints=websecure"
+      - "traefik.http.routers.hindsight-ui-public.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.hindsight-ui-public.service=hindsight-ui"
+      # UI - Private Domain (port 9999)
+      - "traefik.http.routers.hindsight-ui-private.rule=Host(`${HINDSIGHT_UI_INTERNAL_DOMAIN}`)"
+      - "traefik.http.routers.hindsight-ui-private.entrypoints=websecure"
+      - "traefik.http.routers.hindsight-ui-private.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.hindsight-ui-private.service=hindsight-ui"
+      # UI Service configuration
+      - "traefik.http.services.hindsight-ui.loadbalancer.server.port=9999"
       - "traefik.docker.network=traefik_public"
     networks:
       - ai-app
@@ -185,5 +135,4 @@ networks:
 volumes:
   whisper_models:
   ollama_data:
-  openmemory_vectors:
-  openmemory_db:
+  hindsight_data:
