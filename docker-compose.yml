@@ -73,6 +73,9 @@ services:
       - "8888"
       - "9999"
     environment:
+      # Enable both API and Control Plane (UI)
+      - HINDSIGHT_ENABLE_API=true
+      - HINDSIGHT_ENABLE_CP=true
       # LLM Configuration (Ollama)
       - HINDSIGHT_API_LLM_PROVIDER=ollama
       - HINDSIGHT_API_LLM_BASE_URL=http://ollama:11434/v1
@@ -83,6 +86,8 @@ services:
       - HINDSIGHT_API_HOST=0.0.0.0
       - HINDSIGHT_API_PORT=8888
       - HINDSIGHT_API_LOG_LEVEL=${HINDSIGHT_LOG_LEVEL:-info}
+      # Control Plane UI configuration
+      - HINDSIGHT_CP_DATAPLANE_API_URL=http://localhost:8888
     volumes:
       - hindsight_data:/home/hindsight/.pg0
     restart: unless-stopped
