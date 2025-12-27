@@ -65,10 +65,14 @@ services:
   # ============================================
   # Vectorize Hindsight with embedded PostgreSQL
   # GitHub: https://github.com/vectorize-io/hindsight
-  # MCP endpoint: /mcp/{bank_id}/ (per-user memory banks)
+  # MCP endpoint: /mcp/{bank_id}/sse (per-user memory banks)
+  #
+  # Using custom build with MCP endpoint fix
+  # Built from: https://github.com/Gumbees/hindsight
+  # Fix: http_app(path="/") in mcp.py line 136
 
   hindsight:
-    image: ghcr.io/vectorize-io/hindsight:0.1.10
+    image: ghcr.io/gumbees/hindsight:fixed-mcp
     expose:
       - "8888"
       - "9999"
