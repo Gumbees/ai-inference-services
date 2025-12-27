@@ -88,15 +88,13 @@ services:
     expose:
       - "8765"
     environment:
-      - OPENAI_API_KEY=sk-not-used-ollama-configured
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - USER=${OPENMEMORY_USER:-nate}
-      - OLLAMA_HOST=http://ollama:11434
       # Qdrant connection
       - QDRANT_HOST=mem0_store
       - QDRANT_PORT=6333
     volumes:
       - openmemory_data:/app/data
-      - ./openmemory-config.json:/usr/src/openmemory/api/config.json:ro
     restart: unless-stopped
     logging:
       driver: json-file
@@ -128,7 +126,8 @@ services:
     expose:
       - "3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://openmemory-mcp:8765
+      # Must be external URL - browser can't reach internal Docker hostnames
+      - NEXT_PUBLIC_API_URL=https://${OPENMEMORY_API_INTERNAL_DOMAIN}
       - NEXT_PUBLIC_USER_ID=${OPENMEMORY_USER:-nate}
     restart: unless-stopped
     logging:
