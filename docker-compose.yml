@@ -83,6 +83,30 @@ services:
     networks:
       - ai-app
 
+  openmemory-db:
+    image: postgres:15-alpine
+    expose:
+      - "5432"
+    environment:
+      - POSTGRES_USER=${OPENMEMORY_DB_USER:-openmemory}
+      - POSTGRES_PASSWORD=${OPENMEMORY_DB_PASSWORD:-openmemory}
+      - POSTGRES_DB=${OPENMEMORY_DB_NAME:-openmemory}
+    volumes:
+      - openmemory_db:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${OPENMEMORY_DB_USER:-openmemory}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - ai-app
+
   openmemory-mcp:
     image: mem0/openmemory-mcp:latest
     expose:
@@ -90,6 +114,8 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - USER=${OPENMEMORY_USER:-nate}
+      # PostgreSQL database
+      - DATABASE_URL=postgresql://${OPENMEMORY_DB_USER:-openmemory}:${OPENMEMORY_DB_PASSWORD:-openmemory}@openmemory-db:5432/${OPENMEMORY_DB_NAME:-openmemory}
       # Qdrant connection
       - QDRANT_HOST=mem0_store
       - QDRANT_PORT=6333
@@ -102,8 +128,12 @@ services:
         max-size: "10m"
         max-file: "3"
     depends_on:
-      - mem0_store
-      - ollama
+      openmemory-db:
+        condition: service_healthy
+      mem0_store:
+        condition: service_started
+      ollama:
+        condition: service_started
     labels:
       - "traefik.enable=true"
       # Public Domain - API/MCP endpoint
@@ -167,3 +197,4 @@ volumes:
   ollama_data:
   openmemory_vectors:
   openmemory_data:
+  openmemory_db:
