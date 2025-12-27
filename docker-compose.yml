@@ -82,16 +82,20 @@ services:
       - HINDSIGHT_API_LLM_MODEL=${HINDSIGHT_LLM_MODEL:-qwen2.5:7b}
       # Embeddings use built-in local model (384-dim BAAI/bge-small-en-v1.5)
       - HINDSIGHT_API_EMBEDDINGS_PROVIDER=local
-      # Server configuration
+      # Server configuration - bind to all interfaces
       - HINDSIGHT_API_HOST=0.0.0.0
       - HINDSIGHT_API_PORT=8888
       - HINDSIGHT_API_LOG_LEVEL=${HINDSIGHT_LOG_LEVEL:-info}
-      # Control Plane UI configuration
-      - HINDSIGHT_CP_DATAPLANE_API_URL=http://localhost:8888
+      # Control Plane UI configuration - bind to all interfaces
+      - HINDSIGHT_CP_HOST=0.0.0.0
+      - HINDSIGHT_CP_PORT=9999
+      - HINDSIGHT_CP_DATAPLANE_API_URL=http://0.0.0.0:8888
       # Next.js must bind to all interfaces for Traefik
       - HOSTNAME=0.0.0.0
+      - HOST=0.0.0.0
       # Explicitly enable MCP server
       - HINDSIGHT_API_MCP_ENABLED=true
+      - HINDSIGHT_API_MCP_HOST=0.0.0.0
     volumes:
       - hindsight_data:/home/hindsight/.pg0
     restart: unless-stopped
