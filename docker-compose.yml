@@ -29,7 +29,7 @@ services:
         ipv4_address: 192.168.73.90
 
 
-  ollama-1:
+  ollama:
     image: ollama/ollama:rocm
     runtime: amd
     expose:
@@ -61,169 +61,97 @@ services:
       - ai-app
       - traefik_public
 
-  ollama-2:
-    image: ollama/ollama:rocm
-    runtime: amd
+  # ============================================
+  # OpenMemory - AI Memory Layer with UI
+  # ============================================
+  # Official mem0ai pre-built images with web dashboard
+  # Docs: https://docs.mem0.ai/openmemory/overview
+  # Supports Ollama via API config after startup
+
+  openmemory-vectordb:
+    image: qdrant/qdrant:latest
     expose:
-      - "11434"
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-      - AMD_VISIBLE_DEVICES=all
+      - "6333"
     volumes:
-      - ollama_data:/root/.ollama
+      - openmemory_vectors:/qdrant/storage
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '8'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - ai-app
+
+  openmemory-mcp:
+    image: mem0/openmemory-mcp:latest
+    expose:
+      - "8765"
+    environment:
+      # Required to start (configure Ollama via UI/API after)
+      - OPENAI_API_KEY=${OPENMEMORY_OPENAI_KEY:-sk-dummy-configure-ollama-via-ui}
+      - USER=${OPENMEMORY_USER:-nate}
+      # Ollama connection (used after API configuration)
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - openmemory_data:/app/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - openmemory-vectordb
+      - ollama
     labels:
       - "traefik.enable=true"
-      # Public Domain
-      - "traefik.http.routers.ollama-public-2.rule=Host(`${OLLAMA_PUBLIC_DOMAIN}`)"
-      - "traefik.http.routers.ollama-public-2.entrypoints=websecure"
-      - "traefik.http.routers.ollama-public-2.tls.certresolver=letsencrypt"
+      # Public Domain - API/MCP endpoint
+      - "traefik.http.routers.openmemory-api-public.rule=Host(`${OPENMEMORY_API_DOMAIN}`)"
+      - "traefik.http.routers.openmemory-api-public.entrypoints=websecure"
+      - "traefik.http.routers.openmemory-api-public.tls.certresolver=letsencrypt"
       # Private Domain
-      - "traefik.http.routers.ollama-private-2.rule=Host(`${OLLAMA_PRIVATE_DOMAIN}`)"
-      - "traefik.http.routers.ollama-private-2.entrypoints=websecure"
-      - "traefik.http.routers.ollama-private-2.tls.certresolver=letsencrypt"
-      # Service discovery
-      - "traefik.http.services.ollama-2.loadbalancer.server.port=11434"
+      - "traefik.http.routers.openmemory-api-private.rule=Host(`${OPENMEMORY_API_INTERNAL_DOMAIN}`)"
+      - "traefik.http.routers.openmemory-api-private.entrypoints=websecure"
+      - "traefik.http.routers.openmemory-api-private.tls.certresolver=letsencrypt"
+      # Service configuration
+      - "traefik.http.services.openmemory-api.loadbalancer.server.port=8765"
       - "traefik.docker.network=traefik_public"
     networks:
       - ai-app
       - traefik_public
 
-  # postgresql:
-  #   image: postgres:15-alpine
-  #   environment:
-  #     - POSTGRES_DB=${POSTGRES_DB:-mem0}
-  #     - POSTGRES_USER=${POSTGRES_USER:-mem0}
-  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mem0_password}
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   expose:
-  #     - "5432"
-  #   restart: unless-stopped
-  #   networks:
-  #     - ai-app
-
-  # mem0:
-  #   image: mem0ai/mem0:latest
-  #   expose:
-  #     - "8080"
-  #   environment:
-  #     - DATABASE_URL=postgresql://${POSTGRES_USER:-mem0}:${POSTGRES_PASSWORD:-mem0_password}@postgresql:5432/${POSTGRES_DB:-mem0}
-  #     - OPENAI_API_KEY=${OPENROUTER_API_KEY:-${OPENAI_API_KEY}}
-  #     - OPENAI_API_BASE=${OPENROUTER_API_BASE:-https://api.openai.com/v1}
-  #     - LLM_MODEL=${LLM_MODEL:-gpt-3.5-turbo}
-  #     - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
-  #     # Mem0 Authentication
-  #     - MEM0_API_KEY=${MEM0_API_KEY:-gumbees-mem0-secret-key}
-  #     - MEM0_AUTH_ENABLED=${MEM0_AUTH_ENABLED:-true}
-  #     - MEM0_ADMIN_TOKEN=${MEM0_ADMIN_TOKEN:-gumbees-admin-token-change-in-production}
-  #   depends_on:
-  #     - postgresql
-  #   restart: unless-stopped
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.mem0.rule=Host(`${MEM0_PUBLIC_DOMAIN}`)"
-  #     - "traefik.http.routers.mem0.entrypoints=websecure"
-  #     - "traefik.http.routers.mem0.tls.certresolver=letsencrypt"
-  #     - "traefik.http.services.mem0.loadbalancer.server.port=8080"
-  #     - "traefik.docker.network=traefik_public"
-  #     # Security: Remove external access if not needed
-  #     - "traefik.http.routers.mem0.middlewares=mem0-auth"
-  #   networks:
-  #     - ai-app
-  #     - traefik_public
-
-  # MCP Server - Commented out for initial setup
-  # Uncomment when ready to enable MCP functionality
-  # gumbees-mcp-server:
-  #   build: ./mcp-server
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     - MEM0_API_URL=http://mem0:8080
-  #     - MEM0_API_KEY=${MEM0_API_KEY:-gumbees-mem0-secret-key}
-  #     - JWT_SECRET=${JWT_SECRET:-gumbees-change-this-secret-in-production}
-  #     - SESSION_SECRET=${SESSION_SECRET:-${JWT_SECRET:-gumbees-change-this-secret-in-production}}
-  #     - NODE_ENV=${NODE_ENV:-production}
-  #     - WEB_ENABLED=${WEB_ENABLED:-true}
-  #     - WEB_PORT=3000
-  #     - BASE_URL=${MCP_BASE_URL:-http://localhost:3000}
-  #     # OAuth/OpenID Configuration
-  #     - OAUTH_ENABLED=${OAUTH_ENABLED:-false}
-  #     - OAUTH_ISSUER=${OAUTH_ISSUER}
-  #     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
-  #     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-  #     - OAUTH_SCOPE=${OAUTH_SCOPE:-openid profile email}
-  #     - OAUTH_CALLBACK_URL=${OAUTH_CALLBACK_URL:-/auth/callback}
-  #     # Redis Configuration
-  #     - REDIS_ENABLED=${REDIS_ENABLED:-false}
-  #     - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-  #     - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
-  #     # Security Configuration
-  #     - MAX_REQUESTS_PER_SESSION=${MAX_REQUESTS_PER_SESSION:-1000}
-  #     - SESSION_TIMEOUT_HOURS=${SESSION_TIMEOUT_HOURS:-24}
-  #     - ENABLE_AUDIT_LOGGING=${ENABLE_AUDIT_LOGGING:-true}
-  #     - SECURITY_LOG_LEVEL=${SECURITY_LOG_LEVEL:-warn}
-  #     # Advanced mem0 Configuration
-  #     - LLM_PROVIDER=${LLM_PROVIDER}
-  #     - LLM_MODEL=${LLM_MODEL}
-  #     - LLM_TEMPERATURE=${LLM_TEMPERATURE}
-  #     - LLM_MAX_TOKENS=${LLM_MAX_TOKENS}
-  #     - EMBEDDER_PROVIDER=${EMBEDDER_PROVIDER}
-  #     - EMBEDDING_MODEL=${EMBEDDING_MODEL}
-  #     - EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS}
-  #     - CHUNK_SIZE=${CHUNK_SIZE}
-  #     - CHUNK_OVERLAP=${CHUNK_OVERLAP}
-  #     - MAX_MEMORIES_PER_USER=${MAX_MEMORIES_PER_USER}
-  #     - MEMORY_RETENTION_DAYS=${MEMORY_RETENTION_DAYS}
-  #     - AUTO_DELETE_MEMORIES=${AUTO_DELETE_MEMORIES}
-  #     - SIMILARITY_THRESHOLD=${SIMILARITY_THRESHOLD}
-  #     - ENABLE_DEDUPLICATION=${ENABLE_DEDUPLICATION}
-  #     - ENABLE_CATEGORIZATION=${ENABLE_CATEGORIZATION}
-  #     - AUTO_CATEGORIZATION=${AUTO_CATEGORIZATION}
-  #     - CONFIG_PATH=${CONFIG_PATH:-/app/data/config.json}
-  #     # Vector Store Configuration
-  #     - VECTOR_STORE_PROVIDER=${VECTOR_STORE_PROVIDER:-postgres}
-  #     - VECTOR_STORE_HOST=${VECTOR_STORE_HOST:-postgresql}
-  #     - VECTOR_STORE_PORT=${VECTOR_STORE_PORT:-5432}
-  #     - VECTOR_STORE_DATABASE=${VECTOR_STORE_DATABASE:-mem0}
-  #     - VECTOR_STORE_USER=${VECTOR_STORE_USER:-mem0}
-  #     - VECTOR_STORE_PASSWORD=${VECTOR_STORE_PASSWORD}
-  #     - VECTOR_STORE_TABLE=${VECTOR_STORE_TABLE:-embeddings}
-  #     - VECTOR_STORE_COLLECTION=${VECTOR_STORE_COLLECTION:-memories}
-  #     - VECTOR_STORE_SSL_MODE=${VECTOR_STORE_SSL_MODE:-prefer}
-  #   volumes:
-  #     - mcp_data:/app/data
-  #   depends_on:
-  #     - mem0
-  #   restart: unless-stopped
-  #   stdin_open: true
-  #   tty: true
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.mcp-config.rule=Host(`${MCP_PUBLIC_DOMAIN}`)"
-  #     - "traefik.http.routers.mcp-config.entrypoints=websecure"
-  #     - "traefik.http.routers.mcp-config.tls.certresolver=letsencrypt"
-  #     - "traefik.http.services.mcp-config.loadbalancer.server.port=3000"
-  #     - "traefik.docker.network=traefik_public"
-  #   networks:
-  #     - ai-app
-  #     - traefik_public
-
-  # redis:
-  #   image: redis:7-alpine
-  #   expose:
-  #     - "6379"
-  #   volumes:
-  #     - redis_data:/data
-  #   restart: unless-stopped
-  #   networks:
-  #     - ai-app
-  #   command: redis-server --appendonly yes
+  openmemory-ui:
+    image: mem0/openmemory-ui:latest
+    expose:
+      - "3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://openmemory-mcp:8765
+      - NEXT_PUBLIC_USER_ID=${OPENMEMORY_USER:-nate}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - openmemory-mcp
+    labels:
+      - "traefik.enable=true"
+      # Public Domain - UI
+      - "traefik.http.routers.openmemory-ui-public.rule=Host(`${OPENMEMORY_UI_DOMAIN}`)"
+      - "traefik.http.routers.openmemory-ui-public.entrypoints=websecure"
+      - "traefik.http.routers.openmemory-ui-public.tls.certresolver=letsencrypt"
+      # Private Domain
+      - "traefik.http.routers.openmemory-ui-private.rule=Host(`${OPENMEMORY_UI_INTERNAL_DOMAIN}`)"
+      - "traefik.http.routers.openmemory-ui-private.entrypoints=websecure"
+      - "traefik.http.routers.openmemory-ui-private.tls.certresolver=letsencrypt"
+      # Service configuration
+      - "traefik.http.services.openmemory-ui.loadbalancer.server.port=3000"
+      - "traefik.docker.network=traefik_public"
+    networks:
+      - ai-app
+      - traefik_public
 
 networks:
   ai-app:
@@ -236,6 +164,5 @@ networks:
 volumes:
   whisper_models:
   ollama_data:
-  postgres_data:
-  mcp_data:
-  redis_data:
+  openmemory_vectors:
+  openmemory_data:
